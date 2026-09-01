@@ -48,6 +48,8 @@ python -m http.server 8000
 
 Then open <http://localhost:8000/test_runner.html>.
 
+Or run it through pages with <https://alvin-kz83.github.io/test-env/test_runner.html>.
+
 ## Administering a quiz
 
 1. Enter the **Participant ID**.
