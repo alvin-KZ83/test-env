@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture Test Runner</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #0b0f14;
+      --panel: #151b23;
+      --panel-2: #0d1218;
+      --border: #303946;
+      --text: #f4f7fb;
+      --muted: #9ba8b7;
+      --accent: #70b7ff;
+      --accent-text: #07111c;
+      --danger: #ff7474;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--background);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .page { max-width: 820px; margin: 0 auto; padding: 32px 20px 64px; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+    }
+
+    h1 { margin: 0 0 8px; font-size: 1.5rem; }
+    h2 { margin: 0 0 14px; font-size: 1.15rem; }
+    p { margin: 0 0 16px; color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      background: var(--panel-2);
+      color: var(--text);
+    }
+
+    select:focus-visible, input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 18px;
+      background: var(--panel);
+      color: var(--text);
+      font: 700 1rem/1.2 inherit;
+      cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+    }
+
+    button:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--accent); }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-text);
+    }
+
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+    .hidden { display: none !important; }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .progress-wrap {
+      height: 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .progress { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; }
+
+    .question {
+      white-space: pre-wrap;
+      font-size: 1.15rem;
+      font-weight: 650;
+      margin-bottom: 24px;
+    }
+
+    .answers { display: grid; gap: 10px; }
+
+    .answer-btn {
+      text-align: left;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .answer-letter { font-weight: 800; color: var(--muted); min-width: 1.4em; }
+
+    .notice {
+      margin-top: 18px;
+      padding: 13px 15px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .error {
+      margin-top: 14px;
+      color: var(--danger);
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    code {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    @media (max-width: 650px) {
+      .grid { grid-template-columns: 1fr; }
+      .card { padding: 20px; }
+      .page { padding: 20px 14px 48px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <section id="setupCard" class="card">
+    <h1>Knowledge Quiz Interface</h1>
+
+    <div class="grid">
+      <div>
+        <label for="participantId">Participant ID</label>
+        <input id="participantId" placeholder="e.g. 01" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div>
+        <label for="lecture">Lecture</label>
+        <select id="lecture">
+          <option value="psych">Psychology</option>
+          <option value="econ">Microeconomics</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="order">Variant</label>
+        <select id="order">
+          <option>123</option>
+          <option>132</option>
+          <option>213</option>
+          <option>231</option>
+          <option>312</option>
+          <option>321</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="test">Test</label>
+        <select id="test">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="startBtn">Load and start test</button>
+    </div>
+
+    <div id="setupError" class="error"></div>
+  </section>
+
+  <section id="testCard" class="card hidden">
+    <div id="testMeta" class="meta"></div>
+    <div class="progress-wrap"><div id="progress" class="progress"></div></div>
+    <h2 id="questionNumber"></h2>
+    <div id="questionText" class="question"></div>
+    <div id="answers" class="answers"></div>
+  </section>
+
+  <section id="completeCard" class="card hidden">
+    <h1>Knowledge Quiz Complete!</h1>
+    <p id="completeText">Your responses have been recorded.</p>
+
+    <div class="row">
+      <button class="primary" id="endTestBtn">End Quiz</button>
+      <button id="restartBtn">Return</button>
+    </div>
+    
+    <div id="completeError" class="error"></div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// SETTINGS  --  keep RESULT_PASSPHRASE identical to decode_results.py
+// ---------------------------------------------------------------------------
+const RESULT_PASSPHRASE = "change-this-quiz-passphrase";
+const KDF_ITERATIONS = 210000;
+const AAD_PREFIX = "quiz-result/v1";
+const IDK_TEXT = "I don't know";
+const LETTERS = ["A", "B", "C", "D", "E"];
+// ---------------------------------------------------------------------------
+
+let questions = [];
+let currentIndex = 0;
+let outcomes = [];          // "correct" | "incorrect" | "idk", in question order
+let questionRecords = [];  // per-question result metadata with timing and provenance
+let questionStartAt = null;
+let startedAt = null;
+let configuration = null;
+let testInProgress = false;
+
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder();
+
+// ---- answer shuffling ----
+function shuffle(array) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const r = new Uint32Array(1);
+    crypto.getRandomValues(r);
+    const j = r[0] % (i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function randomizeAnswers(answerArray) {
+  if (!Array.isArray(answerArray) || answerArray.length !== 5) {
+    throw new Error("Each question must contain exactly 5 answers.");
+  }
+  const substantive = answerArray.filter((a) => a !== IDK_TEXT);
+  if (substantive.length !== 4 || !answerArray.includes(IDK_TEXT)) {
+    throw new Error("Expected four substantive answers plus \"I don't know\".");
+  }
+  return [...shuffle(substantive), IDK_TEXT];
+}
+
+function buildPath(lecture, order, test) {
+  return "all.json";
+}
+
+function resolveQuestionSet(bundle, lecture, order, test) {
+  if (bundle && bundle[lecture] && bundle[lecture][order] && bundle[lecture][order][test]) {
+    return bundle[lecture][order][test];
+  }
+
+  const legacyPath = `${lecture}_${order}/${lecture}_test_${test}.json`;
+  if (bundle && bundle.source_file === legacyPath) {
+    return bundle;
+  }
+
+  return null;
+}
+
+// ---- result encoding (mirrors decode_results.py) ----
+function toB64(bytes) {
+  const b = new Uint8Array(bytes);
+  let s = "";
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+
+function toHex(bytes) {
+  const b = new Uint8Array(bytes);
+  let s = "";
+  for (let i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, "0");
+  return s;
+}
+
+async function deriveKey(passphrase, salt, iterations) {
+  const base = await crypto.subtle.importKey(
+    "raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+}
+
+function buildResultFile(meta, responses) {
+  const summary = {
+    total_questions: responses.length,
+    correct: responses.filter((r) => r.outcome === "correct").length,
+    incorrect: responses.filter((r) => r.outcome === "incorrect").length,
+    idk: responses.filter((r) => r.outcome === "idk").length
+  };
+
+  return {
+    format: "quiz-result",
+    v: 1,
+    meta,
+    summary,
+    responses
+  };
+}
+
+// ---- load ----
+async function loadTest() {
+  $("setupError").textContent = "";
+
+  const participantId = $("participantId").value.trim();
+  const lecture = $("lecture").value;
+  const order = $("order").value;
+  const test = $("test").value;
+
+  if (!participantId) {
+    $("setupError").textContent = "Enter a participant ID.";
+    return;
+  }
+
+  const path = buildPath(lecture, order, test);
+
+  try {
+    const response = await fetch(path, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Could not load ${path} (HTTP ${response.status}).`);
+    }
+
+    const bundle = await response.json();
+    const testData = resolveQuestionSet(bundle, lecture, order, test);
+
+    if (!testData || !Array.isArray(testData.questions) || testData.questions.length === 0) {
+      throw new Error(`The bundle ${path} does not contain a valid ${lecture}/${order}/${test} question set.`);
+    }
+
+    configuration = {
+      participant_id: participantId,
+      lecture,
+      assigned_order: Number(order),
+      test,
+      source_file: path,
+      source_key: `${lecture}/${order}/${test}`
+    };
+
+    questions = testData.questions.map((q) => {
+      if (!q.id || !q.q || !Array.isArray(q.a) || typeof q.k !== "string") {
+        throw new Error("A question in the JSON has an unexpected structure.");
+      }
+      if (!q.a.includes(q.k)) {
+        throw new Error(`${q.id}: correct-answer key does not match any option.`);
+      }
+      return {
+        id: q.id,
+        q: q.q,
+        a: randomizeAnswers(q.a),
+        k: q.k,
+        source_variant: q.source_variant || null
+      };
+    });
+
+    currentIndex = 0;
+    outcomes = [];
+    questionRecords = [];
+    questionStartAt = Date.now();
+    startedAt = new Date().toISOString();
+    testInProgress = true;
+
+    resetEndButton();
+    $("setupCard").classList.add("hidden");
+    $("completeCard").classList.add("hidden");
+    $("testCard").classList.remove("hidden");
+    renderQuestion();
+  } catch (err) {
+    $("setupError").textContent =
+      err.message +
+      "\n\nIf you opened this file by double-clicking it, serve the folder through a " +
+      "local web server instead (e.g. `python -m http.server` in this folder).";
+  }
+}
+
+function renderQuestion() {
+  const q = questions[currentIndex];
+  questionStartAt = Date.now();
+
+  $("testMeta").textContent =
+    `${configuration.participant_id}  ·  ${configuration.lecture}  ·  ` +
+    `Test ${configuration.test}  ·  Order ${configuration.assigned_order}`;
+  $("questionNumber").textContent = `Question ${currentIndex + 1} of ${questions.length}`;
+  $("questionText").textContent = q.q;
+  $("progress").style.width = `${(currentIndex / questions.length) * 100}%`;
+
+  const box = $("answers");
+  box.replaceChildren();
+
+  q.a.forEach((answer, index) => {
+    const btn = document.createElement("button");
+    btn.className = "answer-btn";
+
+    const letter = document.createElement("span");
+    letter.className = "answer-letter";
+    letter.textContent = `${LETTERS[index]}.`;
+
+    const text = document.createElement("span");
+    text.textContent = answer;
+
+    btn.append(letter, text);
+    btn.addEventListener("click", () => recordAnswer(answer));
+    box.appendChild(btn);
+  });
+}
+
+function recordAnswer(selectedAnswer) {
+  const q = questions[currentIndex];
+  const timeMs = Date.now() - questionStartAt;
+
+  let outcome;
+  if (selectedAnswer === IDK_TEXT) outcome = "idk";
+  else if (selectedAnswer === q.k) outcome = "correct";
+  else outcome = "incorrect";
+
+  questionRecords.push({
+    index: questionRecords.length + 1,
+    question_id: q.id,
+    question_text: q.q,
+    lecture: configuration.lecture,
+    source_test: configuration.test,
+    source_variant: q.source_variant || null,
+    selected_answer: selectedAnswer,
+    correct_answer: q.k,
+    outcome,
+    time_ms: timeMs
+  });
+
+  outcomes.push(outcome);
+  currentIndex++;
+
+  if (currentIndex < questions.length) {
+    renderQuestion();
+  } else {
+    finishTest();
+  }
+}
+
+function finishTest() {
+  testInProgress = false;
+  $("progress").style.width = "100%";
+  $("testCard").classList.add("hidden");
+  $("completeCard").classList.remove("hidden");
+}
+
+// 1 = correct, -1 = incorrect, 0 = "I don't know"
+function outcomesToCodes() {
+  return outcomes.map((o) => (o === "correct" ? 1 : o === "incorrect" ? -1 : 0));
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function resetEndButton() {
+  const btn = $("endTestBtn");
+  btn.disabled = false;
+  btn.textContent = "End test";
+  $("completeError").textContent = "";
+}
+
+async function endTest() {
+  const btn = $("endTestBtn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  $("completeError").textContent = "";
+
+  try {
+    const finishedAt = new Date().toISOString();
+    const meta = {
+      lecture: configuration.lecture,
+      test: configuration.test,
+      assigned_order: configuration.assigned_order,
+      participant_id: configuration.participant_id,
+      source_file: configuration.source_file,
+      n_questions: questions.length,
+      started_at: startedAt,
+      finished_at: finishedAt,
+      duration_ms: Date.parse(finishedAt) - Date.parse(startedAt)
+    };
+
+    const fileObj = buildResultFile(meta, questionRecords);
+    const stamp = finishedAt.replace(/[:.]/g, "-");
+    const safeId = meta.participant_id.replace(/[^A-Za-z0-9_-]/g, "_");
+    const filename = `quiz_${meta.lecture}_${meta.test}_${safeId}_${stamp}.json`;
+
+    downloadBlob(
+      new Blob([JSON.stringify(fileObj, null, 2)], { type: "application/json" }),
+      filename
+    );
+
+    btn.textContent = "Saved ✓";
+    $("completeText").textContent =
+      `Results saved as ${filename}. Return to setup for the next participant.`;
+  } catch (err) {
+    $("completeError").textContent = `Could not save the results file: ${err.message}`;
+    btn.disabled = false;
+    btn.textContent = "End test";
+  }
+}
+
+function restart() {
+  questions = [];
+  outcomes = [];
+  questionRecords = [];
+  questionStartAt = null;
+  currentIndex = 0;
+  configuration = null;
+  testInProgress = false;
+
+  $("completeCard").classList.add("hidden");
+  $("testCard").classList.add("hidden");
+  $("setupCard").classList.remove("hidden");
+  $("completeText").textContent = "Your responses have been recorded.";
+  resetEndButton();
+}
+
+// ---- init ----
+if (!(window.crypto && crypto.subtle)) {
+  $("setupError").textContent =
+    "This browser has no Web Crypto API. Use a current Chrome, Edge, Firefox or " +
+    "Safari, served over https:// or http://localhost.";
+  $("startBtn").disabled = true;
+}
+
+window.addEventListener("beforeunload", (event) => {
+  if (testInProgress) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
+$("startBtn").addEventListener("click", loadTest);
+$("endTestBtn").addEventListener("click", endTest);
+$("restartBtn").addEventListener("click", restart);
+</script>
+</body>
+</html>
