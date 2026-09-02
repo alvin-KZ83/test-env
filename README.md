@@ -3,6 +3,10 @@
 A single-page quiz runner used to administer lecture knowledge tests to study
 participants and collect their responses as end-to-end encrypted JSON.
 
+> **Setting this up for a study? Start with [`COLLECTION_SETUP.md`](COLLECTION_SETUP.md)** —
+> the full step-by-step for keys, the Google Sheet collector, publishing, and
+> decrypting results. This file is just reference material.
+
 ## Contents
 
 | File | Purpose |
@@ -12,6 +16,7 @@ participants and collect their responses as end-to-end encrypted JSON.
 | `server/Code.gs` | Google Apps Script web app that receives results into a Google Sheet. |
 | `tools/decrypt.py` | Decrypts collected results and builds `summary.csv` / `responses_long.csv`. |
 | `tools/gen_keys.sh` | Generates your own RSA keypair. |
+| `tools/keys/` | `public_key.pem` (committed) and `private_key.pem` (git-ignored — keep it safe). |
 | `COLLECTION_SETUP.md` | Step-by-step for wiring up collection. |
 
 ## Question bank structure
