@@ -228,7 +228,7 @@
         </select>
       </div>
 
-      <div>
+      <div id="orderField">
         <label for="order">Variant</label>
         <select id="order">
           <option>123</option>
@@ -240,7 +240,7 @@
         </select>
       </div>
 
-      <div>
+      <div id="testField">
         <label for="test">Test</label>
         <select id="test">
           <option value="A">A</option>
@@ -252,6 +252,11 @@
 
     <div class="row">
       <button class="primary" id="startBtn">Load and start test</button>
+    </div>
+
+    <div id="randomNotice" class="notice hidden">
+      Random assignment is on: Variant and Test are picked at random for each
+      participant when the test starts.
     </div>
 
     <div id="setupError" class="error"></div>
@@ -302,6 +307,15 @@ const PUBLIC_KEY_SPKI_B64 =
 
 const IDK_TEXT = "I don't know";
 const LETTERS = ["A", "B", "C", "D", "E"];
+const ORDERS = ["123", "132", "213", "231", "312", "321"];
+const TESTS = ["A", "B", "C"];
+
+// Selection mode is loaded from config.json ("selectable" | "random").
+//   selectable — the researcher picks Variant and Test from the dropdowns.
+//   random     — the runner assigns a Variant and a Test at random when the
+//                test starts (the dropdowns are hidden).
+// Anything missing/unreadable/unrecognised falls back to "selectable".
+let selectionMode = "selectable";
 
 let questions = [];
 let currentIndex = 0;
@@ -314,13 +328,45 @@ let testInProgress = false;
 
 const $ = (id) => document.getElementById(id);
 
+// ---- randomness helpers ----
+function randInt(n) {
+  const r = new Uint32Array(1);
+  crypto.getRandomValues(r);
+  return r[0] % n;
+}
+
+function randomPick(array) {
+  return array[randInt(array.length)];
+}
+
+// ---- config ----
+async function loadConfig() {
+  try {
+    const res = await fetch("config.json", { cache: "no-store" });
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg && (cfg.selection_mode === "random" || cfg.selection_mode === "selectable")) {
+        selectionMode = cfg.selection_mode;
+      }
+    }
+  } catch (_) {
+    // No config file / not served / malformed — keep the default.
+  }
+  applySelectionMode();
+}
+
+function applySelectionMode() {
+  const random = selectionMode === "random";
+  $("orderField").classList.toggle("hidden", random);
+  $("testField").classList.toggle("hidden", random);
+  $("randomNotice").classList.toggle("hidden", !random);
+}
+
 // ---- answer shuffling ----
 function shuffle(array) {
   const copy = [...array];
   for (let i = copy.length - 1; i > 0; i--) {
-    const r = new Uint32Array(1);
-    crypto.getRandomValues(r);
-    const j = r[0] % (i + 1);
+    const j = randInt(i + 1);
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
@@ -377,8 +423,8 @@ async function loadTest() {
 
   const participantId = $("participantId").value.trim();
   const lecture = $("lecture").value;
-  const order = $("order").value;
-  const test = $("test").value;
+  const order = selectionMode === "random" ? randomPick(ORDERS) : $("order").value;
+  const test = selectionMode === "random" ? randomPick(TESTS) : $("test").value;
 
   if (!participantId) {
     $("setupError").textContent = "Enter a participant ID.";
@@ -406,7 +452,8 @@ async function loadTest() {
       assigned_order: Number(order),
       test,
       source_file: path,
-      source_key: `${lecture}/${order}/${test}`
+      source_key: `${lecture}/${order}/${test}`,
+      selection_mode: selectionMode
     };
 
     questions = testData.questions.map((q) => {
@@ -639,6 +686,7 @@ async function endTest() {
     lecture: configuration.lecture,
     test: configuration.test,
     assigned_order: configuration.assigned_order,
+    selection_mode: configuration.selection_mode,
     participant_id: configuration.participant_id,
     source_file: configuration.source_file,
     n_questions: questions.length,
@@ -734,6 +782,8 @@ window.addEventListener("beforeunload", (event) => {
 $("startBtn").addEventListener("click", loadTest);
 $("endTestBtn").addEventListener("click", endTest);
 $("restartBtn").addEventListener("click", restart);
+
+loadConfig();
 </script>
 </body>
 </html>

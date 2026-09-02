@@ -12,6 +12,7 @@ participants and collect their responses as end-to-end encrypted JSON.
 | File | Purpose |
 | --- | --- |
 | `test_runner.html` | The quiz interface (setup screen, question flow, encrypted results upload). No build step, no dependencies. |
+| `config.json` | Selection mode: `selectable` (researcher picks Variant + Test) or `random` (both assigned at random on start). |
 | `all.json` | The question bank: every lecture / variant / test combination in one bundle. |
 | `server/Code.gs` | Google Apps Script web app that receives results into a Google Sheet. |
 | `tools/decrypt.py` | Decrypts collected results and builds `summary.csv` / `responses_long.csv`. |
@@ -58,6 +59,24 @@ python -m http.server 8000
 Then open <http://localhost:8000/test_runner.html>.
 
 Or run it through pages with <https://alvin-kz83.github.io/test-env/test_runner.html>.
+
+## Selection mode
+
+`config.json` controls how the Variant and Test are chosen:
+
+```json
+{ "selection_mode": "selectable" }
+```
+
+- **`selectable`** (default) — the setup screen shows the **Variant** and
+  **Test** dropdowns and the researcher picks them.
+- **`random`** — those two dropdowns are hidden; when the test starts the
+  runner assigns a Variant (`123`…`321`) and a Test (`A`/`B`/`C`) uniformly at
+  random (crypto RNG). Lecture and Participant ID are still entered by hand.
+
+The chosen mode is recorded on each result as `meta.selection_mode`. If
+`config.json` is missing, unreachable, or malformed, the runner falls back to
+`selectable`.
 
 ## Administering a quiz
 
