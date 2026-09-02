@@ -282,6 +282,24 @@
 <script>
 "use strict";
 
+// ---------------------------------------------------------------------------
+// Result collection
+// ---------------------------------------------------------------------------
+// COLLECT_URL: the Google Apps Script web-app URL that receives results
+//   (see COLLECTION_SETUP.md, step 3 — it looks like
+//    https://script.google.com/macros/s/AKfy.../exec ).
+//   Leave "" to disable upload and fall back to a local download.
+// PUBLIC_KEY_SPKI_B64: your RSA public key, SPKI DER, base64, one line
+//   (see COLLECTION_SETUP.md, step 1). Results are encrypted with this key
+//   in the browser; only the matching private key can read them.
+// COLLECT_TOKEN: optional shared string; if you set the same value in the
+//   Apps Script, submissions without it are rejected. Not a real secret
+//   (it ships in this file) — just cuts down on random noise.
+const COLLECT_URL = "https://script.google.com/macros/s/AKfycbyagxydJSMpll8X7QCcmDFf6Up6xphp8UnStIZwitZHZAxyhMsnIPByX50vTNz1r9tf/exec";
+const COLLECT_TOKEN = "idontevenwanttobehere";
+const PUBLIC_KEY_SPKI_B64 =
+  "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAntIxY7HRQYEORy5VVg15svqJ3HJ5K7LgcJFww+yj2keVRbjY3TsksHvSGTsrdefZOTSiwP0ZdR6RzrR1DCDfQB2OFsobm9Siti8enp/WZqGah74XyvedhJGMaT6ZFgq6qO2HpSWwsbirSUDKJ3RDSSDv70s1ylfK7EErPB7jNV2ogv3oYHMkQHwsk1GLeIYzpoWlDbTM6pB3qtkZFxzZwW419Ubce9GdYK0ICd0o2n1vGfbixD0vWdoQBl+uPMXuXIRX8zDUB45TijtcTMOHftwPuxXz93qMx/K9/2ruslLwR+fcDeZtCO+qOR0z2I8cB6uO6if6n1MzdluPccA3CA7KC9WB9EzHwE6HCYpPGzDaj4Z1yeiL6LlY/q0yn0QepisUd4oA7xkcGdIZqg9jtSkEKkWZSms8dzv8MPySZxvdSH9UoCQ6P78XHSb16YT9KrPkYjosyeYl+WiilU2iBeag8jXuHahMUvWIVimlAUgzCQVT+Cr8Idl60U+Rmd2ZAgMBAAE=";
+
 const IDK_TEXT = "I don't know";
 const LETTERS = ["A", "B", "C", "D", "E"];
 
@@ -504,6 +522,94 @@ function outcomesToCodes() {
   return outcomes.map((o) => (o === "correct" ? 1 : o === "incorrect" ? -1 : 0));
 }
 
+// ---- encryption ----
+// Hybrid scheme: a fresh AES-256-GCM key encrypts the result JSON; that AES
+// key is then wrapped with the RSA-OAEP public key above. Only the holder of
+// the private key can unwrap it. See tools/decrypt.py for the other side.
+function b64(bytes) {
+  let s = "";
+  const arr = new Uint8Array(bytes);
+  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s);
+}
+
+function base64ToBytes(str) {
+  const bin = atob(str);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+let publicKeyPromise = null;
+function getPublicKey() {
+  if (!PUBLIC_KEY_SPKI_B64) {
+    return Promise.reject(new Error("No PUBLIC_KEY_SPKI_B64 configured in this file."));
+  }
+  if (!publicKeyPromise) {
+    publicKeyPromise = crypto.subtle.importKey(
+      "spki",
+      base64ToBytes(PUBLIC_KEY_SPKI_B64),
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    );
+  }
+  return publicKeyPromise;
+}
+
+async function encryptResult(resultObj, meta) {
+  const plaintext = new TextEncoder().encode(JSON.stringify(resultObj));
+
+  const aesKey = await crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, plaintext);
+
+  const rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
+  const wrappedKey = await crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    await getPublicKey(),
+    rawAesKey
+  );
+
+  return {
+    format: "quiz-result-encrypted",
+    v: 1,
+    alg: "RSA-OAEP-SHA256 + AES-256-GCM",
+    // Cleartext so you can track completion in the sheet without decrypting.
+    // Delete these lines (here and in Code.gs) if even that is too much.
+    meta: {
+      participant_id: meta.participant_id,
+      lecture: meta.lecture,
+      test: meta.test,
+      assigned_order: meta.assigned_order,
+      finished_at: meta.finished_at
+    },
+    ek: b64(wrappedKey),
+    iv: b64(iv),
+    ct: b64(ciphertext)
+  };
+}
+
+async function uploadResult(payload) {
+  if (!COLLECT_URL) throw new Error("upload disabled (no COLLECT_URL)");
+  const body = COLLECT_TOKEN ? { ...payload, token: COLLECT_TOKEN } : payload;
+  const res = await fetch(COLLECT_URL, {
+    method: "POST",
+    // text/plain keeps this a "simple" CORS request (no preflight); the
+    // Apps Script redirect target still returns Access-Control-Allow-Origin.
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(body),
+    redirect: "follow"
+  });
+  if (!res.ok) throw new Error(`server returned HTTP ${res.status}`);
+  const out = await res.json().catch(() => ({}));
+  if (out && out.ok === false) throw new Error(out.error || "server rejected the submission");
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -518,47 +624,78 @@ function downloadBlob(blob, filename) {
 function resetEndButton() {
   const btn = $("endTestBtn");
   btn.disabled = false;
-  btn.textContent = "End test";
+  btn.textContent = "End Quiz";
   $("completeError").textContent = "";
 }
 
 async function endTest() {
   const btn = $("endTestBtn");
   btn.disabled = true;
-  btn.textContent = "Saving…";
+  btn.textContent = "Submitting…";
   $("completeError").textContent = "";
 
+  const finishedAt = new Date().toISOString();
+  const meta = {
+    lecture: configuration.lecture,
+    test: configuration.test,
+    assigned_order: configuration.assigned_order,
+    participant_id: configuration.participant_id,
+    source_file: configuration.source_file,
+    n_questions: questions.length,
+    started_at: startedAt,
+    finished_at: finishedAt,
+    duration_ms: Date.parse(finishedAt) - Date.parse(startedAt)
+  };
+
+  const stamp = finishedAt.replace(/[:.]/g, "-");
+  const safeId = meta.participant_id.replace(/[^A-Za-z0-9_-]/g, "_");
+  const baseName = `quiz_${meta.lecture}_${meta.test}_${safeId}_${stamp}`;
+
+  let payload;
   try {
-    const finishedAt = new Date().toISOString();
-    const meta = {
-      lecture: configuration.lecture,
-      test: configuration.test,
-      assigned_order: configuration.assigned_order,
-      participant_id: configuration.participant_id,
-      source_file: configuration.source_file,
-      n_questions: questions.length,
-      started_at: startedAt,
-      finished_at: finishedAt,
-      duration_ms: Date.parse(finishedAt) - Date.parse(startedAt)
-    };
-
     const fileObj = buildResultFile(meta, questionRecords);
-    const stamp = finishedAt.replace(/[:.]/g, "-");
-    const safeId = meta.participant_id.replace(/[^A-Za-z0-9_-]/g, "_");
-    const filename = `quiz_${meta.lecture}_${meta.test}_${safeId}_${stamp}.json`;
+    payload = await encryptResult(fileObj, meta);
+  } catch (err) {
+    // Encryption itself failed — nothing safe to send. Surface it and let
+    // them retry rather than silently leaking a plaintext file.
+    $("completeError").textContent =
+      `Could not encrypt the results: ${err.message}\n` +
+      `Please tell the researcher — do not close this tab yet.`;
+    btn.disabled = false;
+    btn.textContent = "Try again";
+    return;
+  }
 
+  const saveEncryptedFile = () =>
     downloadBlob(
-      new Blob([JSON.stringify(fileObj, null, 2)], { type: "application/json" }),
-      filename
+      new Blob([JSON.stringify(payload)], { type: "application/json" }),
+      `${baseName}.enc.json`
     );
 
+  if (!COLLECT_URL) {
+    // No endpoint configured: encrypted-file mode.
+    saveEncryptedFile();
     btn.textContent = "Saved ✓";
     $("completeText").textContent =
-      `Results saved as ${filename}. Return to setup for the next participant.`;
+      `An encrypted results file "${baseName}.enc.json" has been saved. ` +
+      `Please send it to the researcher.`;
+    return;
+  }
+
+  try {
+    await uploadResult(payload);
+    btn.textContent = "Submitted ✓";
+    $("completeText").textContent =
+      "Your responses have been submitted. Thank you — you can close this tab.";
   } catch (err) {
-    $("completeError").textContent = `Could not save the results file: ${err.message}`;
-    btn.disabled = false;
-    btn.textContent = "End test";
+    // Upload failed (offline, endpoint down). Don't lose the data: hand over
+    // the encrypted file so it can be emailed to the researcher.
+    saveEncryptedFile();
+    btn.textContent = "Saved to this device";
+    $("completeError").textContent =
+      `Could not reach the server (${err.message}).\n` +
+      `An encrypted file "${baseName}.enc.json" has been downloaded instead — ` +
+      `please email it to the researcher. It contains no readable data.`;
   }
 }
 
@@ -580,9 +717,10 @@ function restart() {
 }
 
 // ---- init ----
-if (!(window.crypto && crypto.getRandomValues)) {
+if (!(window.crypto && crypto.getRandomValues && crypto.subtle)) {
   $("setupError").textContent =
-    "This browser has no Web Crypto API. Use a current Chrome, Edge, Firefox or Safari.";
+    "This browser has no Web Crypto API (or the page is not served over HTTPS). " +
+    "Use a current Chrome, Edge, Firefox or Safari over https:// or http://localhost.";
   $("startBtn").disabled = true;
 }
 

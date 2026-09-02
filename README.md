@@ -1,14 +1,18 @@
 # Knowledge Quiz Test Environment
 
 A single-page quiz runner used to administer lecture knowledge tests to study
-participants and export their responses as JSON.
+participants and collect their responses as end-to-end encrypted JSON.
 
 ## Contents
 
 | File | Purpose |
 | --- | --- |
-| `test_runner.html` | The quiz interface (setup screen, question flow, results export). No build step, no dependencies. |
+| `test_runner.html` | The quiz interface (setup screen, question flow, encrypted results upload). No build step, no dependencies. |
 | `all.json` | The question bank: every lecture / variant / test combination in one bundle. |
+| `server/Code.gs` | Google Apps Script web app that receives results into a Google Sheet. |
+| `tools/decrypt.py` | Decrypts collected results and builds `summary.csv` / `responses_long.csv`. |
+| `tools/gen_keys.sh` | Generates your own RSA keypair. |
+| `COLLECTION_SETUP.md` | Step-by-step for wiring up collection. |
 
 ## Question bank structure
 
@@ -57,20 +61,23 @@ Or run it through pages with <https://alvin-kz83.github.io/test-env/test_runner.
 3. Click **Load and start test**.
 4. The participant answers each question by clicking an option; there is no
    going back. Per-question response time is recorded.
-5. On the completion screen, click **End Quiz** to download the results file.
+5. On the completion screen, click **End Quiz**. The results are encrypted in
+   the browser and uploaded to your collection endpoint (see
+   [`COLLECTION_SETUP.md`](COLLECTION_SETUP.md)); the participant sees
+   **Submitted ✓**. If the upload fails, an encrypted `*.enc.json` file is
+   downloaded instead as a fallback to email over.
    **Return** goes back to the setup screen for the next participant.
 
 A `beforeunload` guard warns if the tab is closed mid-quiz.
 
-## Results file
+## Results
 
-Downloaded as:
+Each submission is uploaded encrypted (RSA-OAEP + AES-256-GCM) and stored as
+one row in your Google Sheet. Run `tools/decrypt.py` on the exported CSV to
+recover the plaintext result files plus `summary.csv` and
+`responses_long.csv`. See [`COLLECTION_SETUP.md`](COLLECTION_SETUP.md).
 
-```
-quiz_<lecture>_<test>_<participantId>_<timestamp>.json
-```
-
-Shape:
+The decrypted per-submission file has this shape:
 
 ```json
 {
@@ -105,4 +112,6 @@ Shape:
 }
 ```
 
-The file is plain JSON — no encryption is applied to the export.
+On the wire and in the Sheet this is wrapped as `quiz-result-encrypted`
+(`{ meta, ek, iv, ct }`); only the holder of `tools/keys/private_key.pem`
+can read the `ct`.

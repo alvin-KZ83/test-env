@@ -1,0 +1,6 @@
+# NEVER commit the private key — anyone with it can read every participant's answers.
+tools/keys/private_key.pem
+tools/keys/*private*
+# Local working copies of decrypted results
+tools/out/
+*.decrypted.json
