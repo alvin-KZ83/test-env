@@ -89,14 +89,19 @@ function getSheet_() {
 // Write a row whose text cells are stored verbatim. appendRow() lets Sheets
 // parse values, so base64 starting with "+", "=" or "-" became a formula
 // (#ERROR!, #NAME?) and the submission could no longer be decrypted.
-// Formatting the cells as plain text ("@") before writing prevents that.
+// Formatting the cells as plain text ("@") before writing prevents that for
+// "+" / "-" / "@", but setValues() still evaluates a leading "=" as a
+// formula, so those values also get Sheets' apostrophe text prefix (the
+// apostrophe is not part of the stored value or the CSV export).
 // Must run while the script lock is held, so the row number can't race.
 function appendTextRow_(sheet, receivedAt, textValues) {
   var row = sheet.getLastRow() + 1;
   sheet.getRange(row, 1).setValue(receivedAt);
   var range = sheet.getRange(row, 2, 1, textValues.length);
   range.setNumberFormat("@");
-  range.setValues([textValues]);
+  range.setValues([textValues.map(function (v) {
+    return v.charAt(0) === "=" ? "'" + v : v;
+  })]);
 }
 
 // Run once from the Apps Script editor (select selfTest -> Run) after
