@@ -1,5 +1,5 @@
 {
-  "selection_mode": "random",
+  "selection_mode": "selectable",
   "options": [
     "selectable",
     "random"
